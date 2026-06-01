@@ -9,9 +9,9 @@ const app = express();
 const pool = new Pool({
   host: 'localhost',
   port: 5432,
-  database: 'jjj_db',   // ← 본인 DB 이름으로 변경
-  user: 'jjj',       // ← 본인 DB 유저로 변경
-  password: '1234',           // ← 있으면 입력
+  database: '',   // ← 본인 DB 이름으로 변경
+  user: '',       // ← 본인 DB 유저로 변경
+  password: '',           // ← 있으면 입력
 });
 
 // 미들웨어
