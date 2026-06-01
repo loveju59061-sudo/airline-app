@@ -1,0 +1,187 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8">
+  <title>항공편 조회/예약</title>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body { font-family: sans-serif; background: #f0f4f8; padding: 24px; }
+    header { display: flex; justify-content: space-between; align-items: center; background: white; padding: 16px 24px; border-radius: 12px; margin-bottom: 24px; }
+    header h1 { font-size: 18px; color: #1a1a2e; }
+    .user-info { font-size: 14px; color: #555; display: flex; align-items: center; gap: 12px; }
+    button.logout { padding: 6px 14px; background: #e53e3e; color: white; border: none; border-radius: 6px; cursor: pointer; font-size: 13px; }
+    .section { background: white; border-radius: 12px; padding: 24px; margin-bottom: 24px; }
+    h2 { font-size: 16px; margin-bottom: 16px; color: #1a1a2e; }
+    .search-bar { display: flex; gap: 12px; flex-wrap: wrap; }
+    .search-bar input { padding: 9px 12px; border: 1px solid #d1d5db; border-radius: 8px; font-size: 14px; width: 120px; }
+    .search-bar button { padding: 9px 20px; background: #4f46e5; color: white; border: none; border-radius: 8px; cursor: pointer; font-size: 14px; }
+    table { width: 100%; border-collapse: collapse; font-size: 14px; margin-top: 12px; }
+    th { text-align: left; padding: 10px 12px; border-bottom: 2px solid #e2e8f0; color: #555; font-weight: 600; }
+    td { padding: 10px 12px; border-bottom: 1px solid #f0f0f0; }
+    tr:hover td { background: #f9f9ff; }
+    .btn-seats { padding: 5px 12px; background: #4f46e5; color: white; border: none; border-radius: 6px; cursor: pointer; font-size: 13px; }
+    .seats-grid { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 12px; }
+    .seat { padding: 8px 14px; border-radius: 6px; font-size: 13px; cursor: pointer; border: 1px solid #d1d5db; background: #f0f9f0; color: #276749; }
+    .seat.taken { background: #f0f0f0; color: #aaa; cursor: not-allowed; text-decoration: line-through; }
+    .seat:hover:not(.taken) { background: #4f46e5; color: white; }
+    .selected-flight { font-size: 13px; color: #555; margin-top: 8px; }
+    .no-data { color: #aaa; font-size: 14px; padding: 16px 0; }
+  </style>
+</head>
+<body>
+
+<header>
+  <h1>✈ 항공편 예약</h1>
+  <div class="user-info">
+    <span id="welcome"></span>
+    <button class="logout" onclick="logout()">로그아웃</button>
+  </div>
+</header>
+
+<div class="section">
+  <h2>항공편 검색</h2>
+  <div class="search-bar">
+    <input id="from" placeholder="출발 (예: ICN)" maxlength="10">
+    <input id="to" placeholder="도착 (예: NRT)" maxlength="10">
+    <button onclick="searchFlights()">검색</button>
+    <button onclick="searchFlights(true)" style="background:#888">전체 보기</button>
+  </div>
+  <table id="flight-table">
+    <thead>
+      <tr><th>편명</th><th>출발</th><th>도착</th><th>출발 시간</th><th>도착 시간</th><th>기종</th><th>좌석 선택</th></tr>
+    </thead>
+    <tbody id="flight-body">
+      <tr><td colspan="7" class="no-data">검색 버튼을 눌러 항공편을 조회하세요.</td></tr>
+    </tbody>
+  </table>
+</div>
+
+<div class="section" id="seat-section" style="display:none">
+  <h2>좌석 선택</h2>
+  <div class="selected-flight" id="selected-info"></div>
+  <div class="seats-grid" id="seats-grid"></div>
+</div>
+
+<div class="section">
+  <h2>내 예약 목록</h2>
+  <table>
+    <thead>
+      <tr><th>편명</th><th>출발</th><th>도착</th><th>좌석</th><th>출발 시간</th><th>예약 시각</th><th>취소</th></tr>
+    </thead>
+    <tbody id="my-reservations"></tbody>
+  </table>
+</div>
+
+<script>
+  let selectedFlightId = null;
+
+  // 로그인 정보 표시
+  fetch('/api/me').then(r => r.json()).then(data => {
+    if (!data.loggedIn) { location.href = '/'; return; }
+    document.getElementById('welcome').textContent = `${data.name} 님 (ID: ${data.id})`;
+    loadMyReservations();
+  });
+
+  async function searchFlights(all = false) {
+    const from = all ? '' : document.getElementById('from').value;
+    const to   = all ? '' : document.getElementById('to').value;
+    const res = await fetch(`/api/flights?from=${from}&to=${to}`);
+    const flights = await res.json();
+    const tbody = document.getElementById('flight-body');
+
+    if (flights.length === 0) {
+      tbody.innerHTML = '<tr><td colspan="7" class="no-data">해당 항공편이 없습니다.</td></tr>';
+      return;
+    }
+    tbody.innerHTML = flights.map(f => `
+      <tr>
+        <td>${f.flight_number}</td>
+        <td>${f.departure_airport}</td>
+        <td>${f.arrival_airport}</td>
+        <td>${fmt(f.departure_time)}</td>
+        <td>${fmt(f.arrival_time)}</td>
+        <td>${f.model_name}</td>
+        <td><button class="btn-seats" onclick="loadSeats(${f.flight_id}, '${f.flight_number}')">좌석 보기</button></td>
+      </tr>
+    `).join('');
+  }
+
+  async function loadSeats(flightId, flightNumber) {
+    selectedFlightId = flightId;
+    document.getElementById('selected-info').textContent = `선택한 항공편: ${flightNumber}`;
+    document.getElementById('seat-section').style.display = 'block';
+
+    const res = await fetch(`/api/flights/${flightId}/seats`);
+    const seats = await res.json();
+    const grid = document.getElementById('seats-grid');
+    grid.innerHTML = seats.map(s => `
+      <div class="seat ${s.available ? '' : 'taken'}"
+           onclick="${s.available ? `reserve(${flightId}, '${s.seat_number}')` : ''}">
+        ${s.seat_number}<br><small>${s.seat_class}</small>
+      </div>
+    `).join('');
+  }
+
+  async function reserve(flightId, seatNumber) {
+    if (!confirm(`${seatNumber} 좌석을 예약하시겠습니까?`)) return;
+    const res = await fetch('/api/reserve', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ flight_id: flightId, seat_number: seatNumber })
+    });
+    const data = await res.json();
+    if (data.ok) {
+      alert('예약 완료!');
+      loadSeats(flightId, document.getElementById('selected-info').textContent.replace('선택한 항공편: ', ''));
+      loadMyReservations();
+    } else {
+      alert(data.message);
+    }
+  }
+
+  async function loadMyReservations() {
+    const res = await fetch('/api/my-reservations');
+    const list = await res.json();
+    const tbody = document.getElementById('my-reservations');
+    if (list.length === 0) {
+      tbody.innerHTML = '<tr><td colspan="6" class="no-data">예약 내역이 없습니다.</td></tr>';
+      return;
+    }
+    tbody.innerHTML = list.map(r => `
+      <tr>
+        <td>${r.flight_number}</td>
+        <td>${r.departure_airport}</td>
+        <td>${r.arrival_airport}</td>
+        <td>${r.seat_number}</td>
+        <td>${fmt(r.departure_time)}</td>
+        <td>${fmt(r.reserved_at)}</td>
+        <td><button onclick="cancel(${r.reservation_id})" style="padding:4px 10px;background:#e53e3e;color:white;border:none;border-radius:6px;cursor:pointer;font-size:12px">취소</button></td>
+      </tr>
+    `).join('');
+  }
+
+  async function cancel(reservationId) {
+  if (!confirm('예약을 취소하시겠습니까?')) return;
+  const res = await fetch(`/api/reserve/${reservationId}`, {
+    method: 'DELETE'
+  });
+  const data = await res.json();
+  if (data.ok) {
+    alert('취소 완료!');
+    loadMyReservations();
+  } else {
+    alert(data.message);
+  }
+}
+
+  async function logout() {
+    await fetch('/api/logout', { method: 'POST' });
+    location.href = '/';
+  }
+
+  function fmt(dt) {
+    return new Date(dt).toLocaleString('ko-KR', { month:'2-digit', day:'2-digit', hour:'2-digit', minute:'2-digit' });
+  }
+</script>
+</body>
+</html>

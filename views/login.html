@@ -1,0 +1,97 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8">
+  <title>항공 예약 - 로그인</title>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body { font-family: sans-serif; background: #f0f4f8; display: flex; justify-content: center; align-items: center; min-height: 100vh; }
+    .card { background: white; border-radius: 12px; padding: 36px; width: 360px; box-shadow: 0 2px 12px rgba(0,0,0,0.1); }
+    h2 { margin-bottom: 24px; font-size: 20px; color: #1a1a2e; }
+    .tabs { display: flex; margin-bottom: 24px; border-bottom: 2px solid #e2e8f0; }
+    .tab { flex: 1; text-align: center; padding: 10px; cursor: pointer; color: #888; font-size: 14px; }
+    .tab.active { color: #4f46e5; border-bottom: 2px solid #4f46e5; margin-bottom: -2px; font-weight: bold; }
+    .form-group { margin-bottom: 16px; }
+    label { display: block; font-size: 13px; color: #555; margin-bottom: 6px; }
+    input { width: 100%; padding: 10px 12px; border: 1px solid #d1d5db; border-radius: 8px; font-size: 14px; }
+    input:focus { outline: none; border-color: #4f46e5; }
+    button { width: 100%; padding: 12px; background: #4f46e5; color: white; border: none; border-radius: 8px; font-size: 15px; cursor: pointer; margin-top: 8px; }
+    button:hover { background: #4338ca; }
+    .msg { margin-top: 12px; font-size: 13px; color: #e53e3e; text-align: center; }
+    .success { color: #38a169; }
+    .panel { display: none; }
+    .panel.active { display: block; }
+  </style>
+</head>
+<body>
+<div class="card">
+  <h2>✈ 항공 예약 시스템</h2>
+  <div class="tabs">
+    <div class="tab active" onclick="switchTab('login')">로그인</div>
+    <div class="tab" onclick="switchTab('register')">회원가입</div>
+  </div>
+
+  <div id="panel-login" class="panel active">
+    <div class="form-group">
+      <label>승객 ID (passenger_id)</label>
+      <input type="number" id="login-id" placeholder="예: 1">
+    </div>
+    <button onclick="login()">로그인</button>
+    <div id="login-msg" class="msg"></div>
+  </div>
+
+  <div id="panel-register" class="panel">
+    <div class="form-group">
+      <label>이름</label>
+      <input type="text" id="reg-name" placeholder="홍길동">
+    </div>
+    <div class="form-group">
+      <label>이메일</label>
+      <input type="email" id="reg-email" placeholder="hong@example.com">
+    </div>
+    <button onclick="register()">회원가입</button>
+    <div id="reg-msg" class="msg"></div>
+  </div>
+</div>
+
+<script>
+  function switchTab(tab) {
+    document.querySelectorAll('.tab').forEach((t, i) => t.classList.toggle('active', (i === 0) === (tab === 'login')));
+    document.getElementById('panel-login').classList.toggle('active', tab === 'login');
+    document.getElementById('panel-register').classList.toggle('active', tab === 'register');
+  }
+
+  async function login() {
+    const id = document.getElementById('login-id').value;
+    const res = await fetch('/api/login', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ passenger_id: id })
+    });
+    const data = await res.json();
+    const msg = document.getElementById('login-msg');
+    if (data.ok) { location.href = '/flights'; }
+    else { msg.textContent = data.message; }
+  }
+
+  async function register() {
+    const name = document.getElementById('reg-name').value;
+    const email = document.getElementById('reg-email').value;
+    const res = await fetch('/api/register', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ name, email })
+    });
+    const data = await res.json();
+    const msg = document.getElementById('reg-msg');
+    if (data.ok) {
+      msg.className = 'msg success';
+      msg.textContent = `가입 완료! 승객 ID: ${data.passenger.passenger_id} (이 번호로 로그인하세요)`;
+    } else {
+      msg.className = 'msg';
+      msg.textContent = data.message;
+    }
+  }
+</script>
+</body>
+</html>
